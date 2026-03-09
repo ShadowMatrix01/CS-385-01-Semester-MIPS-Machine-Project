@@ -90,7 +90,7 @@ module ALUmsb (a,b,ainvert,binvert,op,less,carryin,carryout,result,set);
 
 input a,b,less,carryin,ainvert,binvert;
    input [1:0] op;
-   output carryout,result;
+   output carryout,result,set;
 
    wire nota,notb;
    wire a1,b1;
@@ -192,7 +192,7 @@ module ALU (op,a,b,result,zero);
         result[12],result[13],result[14],result[15]);
 
 endmodule
-
+//Main control determines if R-type instruction or I-type instruction and sends the coressponding bit [From MSB to LSB] to RegDst,ALUSrc,RegWrite,and ALUOp
 module MainControl (Op,Control); 
   input [3:0] Op;
   output reg [3:0] Control;
@@ -202,7 +202,7 @@ module MainControl (Op,Control);
     4'b1000: Control <= 4'b0110; // ADDI
   endcase
 endmodule
-
+//ALUControl chooses the appropriate operation. Note add and addi have the same func code.
 module ALUControl (ALUOp,FuncCode,ALUCtl); 
   input ALUOp;
   input [5:0] FuncCode;
@@ -210,7 +210,7 @@ module ALUControl (ALUOp,FuncCode,ALUCtl);
   always @(ALUOp,FuncCode) case (ALUOp)
     1'b0: ALUCtl <= 4'b0010; // add
     1'b1: case (FuncCode)
-	     32: ALUCtl <= 4'b0010; // add
+	     32: ALUCtl <= 4'b0010; // addi //This is addi, which has the same func code as add yet a different ALUOp.
 	     34: ALUCtl <= 4'b0110; // sub
 	     36: ALUCtl <= 4'b0000; // and
 	     37: ALUCtl <= 4'b0001; // or
@@ -272,3 +272,26 @@ module test ();
     #18 $finish; //Changed from 16 to 18 to allow IMemory[9] to be executed.
   end
 endmodule
+/* New Output
+Clock PC   IR                                 WD
+1      0   1000000100001111   15 (0000000000001111)
+0      2   1000001000000111    7 (0000000000000111)
+1      2   1000001000000111    7 (0000000000000111)
+0      4   0000011011100100    7 (0000000000000111)
+1      4   0000011011100100    7 (0000000000000111)
+0      6   0000011110100010    8 (0000000000001000)
+1      6   0000011110100010    8 (0000000000001000)
+0      8   0000101110100101   15 (0000000000001111)
+1      8   0000101110100101   15 (0000000000001111)
+0     10   0000101111100000   22 (0000000000010110)
+1     10   0000101111100000   22 (0000000000010110)
+0     12   0000101101100111  -32 (1111111111100000)
+1     12   0000101101100111  -32 (1111111111100000)
+0     14   0000111001101010    0 (0000000000000000)
+1     14   0000111001101010    0 (0000000000000000)
+0     16   0000101101101010    1 (0000000000000001)
+1     16   0000101101101010    1 (0000000000000001)
+0     18   0000101101100110   -7 (1111111111111001)
+newCPU.v:272: $finish called at 18 (1s)
+1     18   0000101101100110   -7 (1111111111111001)
+*/
