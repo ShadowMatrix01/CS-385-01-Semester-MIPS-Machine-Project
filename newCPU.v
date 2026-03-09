@@ -24,7 +24,7 @@ module reg_file (RR1,RR2,WR,WD,RegWrite,RD1,RD2,clock);
 
 endmodule
 
-
+//ALU1 module is used for bits 0 to 14, but excludes the msb which needs a special set flag.
 module ALU1 (a,b,ainvert,binvert,op,less,carryin,carryout,result);
 
    input a,b,less,carryin,ainvert,binvert;
@@ -74,12 +74,12 @@ module ALU1 (a,b,ainvert,binvert,op,less,carryin,carryout,result);
    not (op1n,op[1]);
 
    wire r0,r1,r2,r3;
-
+   //And gates determine what operation should be outputted based on opcodes.
    and (r0,and_out,op1n,op0n);
    and (r1,or_out,op1n,op[0]);
    and (r2,sum,op[1],op0n);
    and (r3,less,op[1],op[0]);
-
+   //Or gates appropriately select the and wire that is high.
    or (result,r0,r1,r2,r3);
 
 endmodule
@@ -88,9 +88,9 @@ endmodule
 // 1-bit MSB ALU (bit 15)
 module ALUmsb (a,b,ainvert,binvert,op,less,carryin,carryout,result,set);
 
-   input a,b,less,carryin,ainvert,binvert;
+input a,b,less,carryin,ainvert,binvert;
    input [1:0] op;
-   output carryout,result,set;
+   output carryout,result;
 
    wire nota,notb;
    wire a1,b1;
@@ -98,9 +98,11 @@ module ALUmsb (a,b,ainvert,binvert,op,less,carryin,carryout,result,set);
    wire sum;
    wire axb,ab,axb_cin;
 
+   // Inverters
    not (nota,a);
    not (notb,b);
 
+   // Input select
    wire na_inv,nb_inv;
    not (na_inv,ainvert);
    not (nb_inv,binvert);
@@ -115,9 +117,11 @@ module ALUmsb (a,b,ainvert,binvert,op,less,carryin,carryout,result,set);
    and (b_sel1,notb,binvert);
    or  (b1,b_sel0,b_sel1);
 
+   // AND / OR
    and (and_out,a1,b1);
    or  (or_out,a1,b1);
 
+   // Full Adder
    xor (axb,a1,b1);
    xor (sum,axb,carryin);
 
@@ -125,19 +129,21 @@ module ALUmsb (a,b,ainvert,binvert,op,less,carryin,carryout,result,set);
    and (axb_cin,axb,carryin);
    or  (carryout,ab,axb_cin);
 
+
    buf (set,sum);   // SLT set output is just the sum output of the MSB ALU
 
+  // Operation select
    wire op0n,op1n;
    not (op0n,op[0]);
    not (op1n,op[1]);
 
    wire r0,r1,r2,r3;
-
+   //And gates determine what operation should be outputted based on opcodes.
    and (r0,and_out,op1n,op0n);
    and (r1,or_out,op1n,op[0]);
    and (r2,sum,op[1],op0n);
    and (r3,less,op[1],op[0]);
-
+   //Or gates appropriately select the and wire that is high.
    or (result,r0,r1,r2,r3);
 
 endmodule
@@ -175,9 +181,10 @@ module ALU (op,a,b,result,zero);
    ALU1 alu13 (a[13],b[13],op[3],op[2],op[1:0],1'b0,c13,c14,result[13]);
    ALU1 alu14 (a[14],b[14],op[3],op[2],op[1:0],1'b0,c14,c15,result[14]);
 
+   //MSB ALU for bit 15 includes special set output for ALU0
    ALUmsb alu15 (a[15],b[15],op[3],op[2],op[1:0],1'b0,c15,c16,result[15],set);
 
-   // Zero flag
+   // Zero flag, later needed for beq and bne.
    nor (zero,
         result[0],result[1],result[2],result[3],
         result[4],result[5],result[6],result[7],
@@ -218,12 +225,13 @@ module CPU (clock,PC,ALUOut,IR);
   input clock;
   output [15:0] ALUOut,IR,PC;
   reg[15:0] PC;
-  reg[15:0] IMemory[0:1023];
+  reg[15:0] IMemory[0:1023]; //Maximum of 1024, 16 bit instruction memory addresses.
   wire [15:0] IR,NextPC,A,B,ALUOut,RD2,SignExtend;
   wire[3:0] ALUctl;
   wire [1:0] WR; 
 // Test Program
   initial begin 
+   //9 Instructions that showcase full instruction set architecture is accomplished here.
     IMemory[0] = 16'h810f;  // addi $t1, $0,  15   ($t1=15)
     IMemory[1] = 16'h8207;  // addi $t2, $0,  7    ($t2=7)
     IMemory[2] = 16'h06e4;  // and  $t3, $t1, $t2  ($t3=7)
@@ -242,9 +250,9 @@ module CPU (clock,PC,ALUOut,IR);
   assign SignExtend = {{8{IR[7]}},IR[7:0]}; // sign extension unit
   //assign ALUctl = (ALUOp == 1'b0) ? 4'b0010 : IR[3:0]; // assign bit values to ALUctl
   reg_file rf (IR[11:10],IR[9:8],WR,ALUOut,RegWrite,A,RD2,clock);
-  ALU fetch (4'b0010,PC,16'd2,NextPC,Unused);
-  ALU ex (ALUctl, A, B, ALUOut, Zero);
-  MainControl MainCtr (IR[15:12],{RegDst,ALUSrc,RegWrite,ALUOp});
+  ALU fetch (4'b0010,PC,16'd2,NextPC,Unused); //Instructions fetched using the program counter incremented by 2 for the next instruction.
+  ALU ex (ALUctl, A, B, ALUOut, Zero); //Fetched instruction is executed either using R-Type or I-Type instruction format.
+  MainControl MainCtr (IR[15:12],{RegDst,ALUSrc,RegWrite,ALUOp}); 
   ALUControl ALUCtrl(ALUOp, IR[5:0], ALUctl); // ALU control unit
   always @(negedge clock) begin 
     PC <= NextPC;
@@ -261,29 +269,6 @@ module test ();
     $display ("Clock PC   IR                                 WD");
     $monitor ("%b     %2d   %b  %3d (%b)",clock,PC,IR,WD,WD);
     clock = 1;
-    #18 $finish;
+    #18 $finish; //Changed from 16 to 18 to allow IMemory[9] to be executed.
   end
 endmodule
-
-
-/* Output
-Clock PC   IR                                 WD
-1      0   1000000100001111   15 (0000000000001111)
-0      2   1000001000000111    7 (0000000000000111)
-1      2   1000001000000111    7 (0000000000000111)
-0      4   0000011011100100    7 (0000000000000111)
-1      4   0000011011100100    7 (0000000000000111)
-0      6   0000011110100010    8 (0000000000001000)
-1      6   0000011110100010    8 (0000000000001000)
-0      8   0000101110100101   15 (0000000000001111)
-1      8   0000101110100101   15 (0000000000001111)
-0     10   0000101111100000   22 (0000000000010110)
-1     10   0000101111100000   22 (0000000000010110)
-0     12   0000101101100111  -32 (1111111111100000)
-1     12   0000101101100111  -32 (1111111111100000)
-0     14   0000111001101010    0 (0000000000000000)
-1     14   0000111001101010    0 (0000000000000000)
-0     16   0000101101101010    1 (0000000000000001)
-CPU2.v:264: $finish called at 16 (1s)
-1     16   0000101101101010    1 (0000000000000001)
-*/
