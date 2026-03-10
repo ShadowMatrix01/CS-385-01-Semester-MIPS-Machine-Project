@@ -169,7 +169,7 @@ main:
         or   $t0, $t3, $t0     # OR(~a, ~b)
         move $a0, $t0
         jal  print_result
-        
+        j program_end
 print_result:
         li   $v0, 1             # syscall 1 = print_int
         syscall
@@ -177,7 +177,7 @@ print_result:
         la   $a0, newline
         syscall
         jr   $ra                # return to caller
-
+program_end:
 # End of program
         li   $v0, 10            # syscall 10 = exit
         syscall
