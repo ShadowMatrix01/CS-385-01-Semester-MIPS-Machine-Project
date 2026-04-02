@@ -106,24 +106,25 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,WD);
    alu fetch (4'b0010,PC,4,NextPC,Unused);
 
 //=== ID STAGE ===
-   wire [4:0] Control;
-   wire [31:0] RD1,RD2,SignExtend,WD;
-   wire [31:0] FWD_RD1,FWD_RD2; // Outputs of the forwarding muxes
-   reg [31:0] IDEX_IR; // For monitoring the pipeline
+   wire [6:0] Control;
+   wire [15:0] RD1,RD2,SignExtend,WD;
+   wire [15:0] FWD_RD1,FWD_RD2; // Outputs of the forwarding muxes
+   reg [15:0] IDEX_IR; // For monitoring the pipeline
    reg IDEX_RegWrite,IDEX_ALUSrc,IDEX_RegDst;
-   reg [1:0]  IDEX_ALUOp;
-   reg [31:0] IDEX_RD1,IDEX_RD2,IDEX_SignExt;
-   reg [4:0]  IDEX_rt,IDEX_rd;
-   wire [4:0] WR;
-   reg_file rf (IFID_IR[25:21],IFID_IR[20:16],WR,WD,IDEX_RegWrite,RD1,RD2,clock);
-   MainControl MainCtr (IFID_IR[31:26],Control); 
-   assign SignExtend = {{16{IFID_IR[15]}},IFID_IR[15:0]}; 
+   reg [3:0]  IDEX_ALUctl; 
+   reg [15:0] IDEX_RD1,IDEX_RD2,IDEX_SignExt;
+   reg [1:0]  IDEX_rt,IDEX_rd;
+   wire [1:0] WR;
+   reg_file rf (IFID_IR[25:21],IFID_IR[20:16],WR,WD,IDEX_RegWrite,RD1,RD2,clock); // markov didnt edit because he didnt want to make a mistake (change [] [])
+   MainControl MainCtr (IFID_IR[15:12],Control); 
+   assign SignExtend = {{16{IFID_IR[15]}},IFID_IR[15:0]}; // markov didnt to it
 
 //=== EXE STAGE ===
-   wire [31:0] B,ALUOut;
-   wire [3:0] ALUctl;
-   alu ex (ALUctl, IDEX_RD1, B, ALUOut, Zero);
-   ALUControl ALUCtrl(IDEX_ALUOp, IDEX_SignExt[5:0], ALUctl); // ALU control unit
+   wire [15:0] B,ALUOut;
+   
+   alu ex (IDEX_ALUctl, IDEX_RD1, B, ALUOut, Zero);
+
+   // no changes to mux vvv
    assign B  = (IDEX_ALUSrc) ? IDEX_SignExt: IDEX_RD2;   // ALUSrc Mux 
    assign WR = (IDEX_RegDst) ? IDEX_rd: IDEX_rt;         // RegDst Mux
    assign WD = ALUOut;
@@ -143,11 +144,11 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,WD);
 
 // Stage 1 - IF
     PC <= NextPC;
-    IFID_IR <= IMemory[PC>>2];
+    IFID_IR <= IMemory[PC>>1];
 
 // Stage 2 - ID
     IDEX_IR <= IFID_IR; // For monitoring the pipeline
-    {IDEX_RegDst,IDEX_ALUSrc,IDEX_RegWrite,IDEX_ALUOp} <= Control;    
+    {IDEX_RegDst,IDEX_ALUSrc,IDEX_RegWrite,IDEX_ALUctl} <= Control;    
 
 //  No Forwarding
     IDEX_RD1 <= RD1; 
@@ -158,18 +159,29 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,WD);
 //  IDEX_RD2 <= FWD_RD2;
 
     IDEX_SignExt <= SignExtend;
-    IDEX_rt <= IFID_IR[20:16];
-    IDEX_rd <= IFID_IR[15:11];
+    IDEX_rt <= IFID_IR[20:16];  // make updates here (markov didn't but said to)
+    IDEX_rd <= IFID_IR[15:11];  // make updates here (markov didn't but said to)
 
 // Stage 3 - EX
 // No transfers needed here - on negedge WD is written into register WR
+
+// this is "the easiest" extra credit of the semester - markov  
+// forwarding muxs are here above 
+            // Forwarding multiplexers
+            // assign FWD_RD1 = (IDEX_RegWrite && WR==IFID_IR[25:21]) ? ALUOut: RD1;
+            // assign FWD_RD2 = (IDEX_RegWrite && WR==IFID_IR[20:16]) ? ALUOut: RD2;
+
+// to do forwarding, comment the "no forwarding" lines and uncomment the "forwarding" lines in the ID stage above.
+// also need to update the diagram to show where the two forwarding muxes are and where they are wired
+// implement the gate logic for mux
+
   end
 endmodule
 
 // Test module
 module test ();
   reg clock;
-  wire signed [31:0] PC,IFID_IR,IDEX_IR,WD;
+  wire signed [31:0] PC,IFID_IR,IDEX_IR,WD; // change here (markov didn't but said to)
   CPU test_cpu(clock,PC,IFID_IR,IDEX_IR,WD);
   always #1 clock = ~clock;
   initial begin
