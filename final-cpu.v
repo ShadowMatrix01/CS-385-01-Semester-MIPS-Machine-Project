@@ -1,29 +1,29 @@
-//Names: Aiden Ocasio, Jacob Rulka, and Jhan Gomez
-//Instructor: Professor Markov
-//Course: CS-385-01
-//Date: 03/31/26
-//Purpose: To show a simplified 16 bit MIPS single cycle machine that can execute R-type instructions and I-type instructions using a mix of behavorial and gate-level modeling.
-// Behavioral implementation of MIPS Register File
-module mux(a, b, a1, b1, select, out); //Mux module for result.
+// Names: Aiden Ocasio, Jacob Rulka, and Jhan Gomez
+// Instructor: Professor Markov
+// Course: CS-385-01
+// Date: 04/02/26
+// Purpose: Complete 16-bit MIPS single-cycle CPU (R-type + I-type)
+
+// MUXES 
+module mux(a, b, a1, b1, select, out);
    input a, b, a1, b1;
    input [1:0] select;
    output out;
-    // Operation select
+
    wire notS0, notS1;
    not (notS0,select[0]);
    not (notS1,select[1]);
 
    wire r0,r1,r2,r3;
-   //And gates determine what operation should be outputted based on opcodes.
+
    and (r0,a,notS1,notS0);
    and (r1,b,notS1,select[0]);
    and (r2,a1,select[1],notS0);
    and (r3,b1,select[1],select[0]);
-   //Or gates appropriately select the and wire that is high.
+
    or (out,r0,r1,r2,r3);
 endmodule
 
-//Needed to adhere to project specifications of gate level muxes for CPU.
 module mux2x1(a, b, select, out);
 input a, b, select;
 output out;
@@ -46,6 +46,7 @@ module muxB (a, b, select, out);
 input [15:0] a, b;
 input select;
 output [15:0] out;
+
 //16 muxes for the respective 16 bits of RD2 and SignExtend
 mux2x1 mux1  (a[0], b[0], select, out[0]);
 mux2x1 mux2  (a[1], b[1], select, out[1]);
@@ -65,10 +66,14 @@ mux2x1 mux15 (a[14], b[14], select, out[14]);
 mux2x1 mux16 (a[15], b[15], select, out[15]);
 
 endmodule
+
+// ALU 
 module fulladder(x, y, sum, carryin, carryout);
    input x, y, carryin;
    output sum, carryout;
-   wire xysum, xycout, ab, axb_cin;
+
+   wire xysum, ab, axb_cin;
+
    xor (xysum,x,y);
    xor (sum,xysum,carryin);
 
@@ -77,43 +82,16 @@ module fulladder(x, y, sum, carryin, carryout);
    or  (carryout,ab,axb_cin);
 endmodule
 
-module reg_file (RR1,RR2,WR,WD,RegWrite,RD1,RD2,clock);
-  input [1:0] RR1,RR2,WR; //Instead of 5 bits for rs, rt, and rd, it is only two bits. 
-  input [15:0] WD; //16 bits for complete instruction rather than the traditional 32 bits.
-  input RegWrite,clock;
-  output [15:0] RD1,RD2; //The read data ports of the reg file are likewise only 16 bits.
-
-  reg [15:0] Regs[0:3]; //4 registers, 16 bits long.
-
-  assign RD1 = Regs[RR1]; //RS is assigned to read data port 1.
-  assign RD2 = Regs[RR2]; //RT is assigned to read data port 2.
-
-  initial Regs[0] = 0; //$zeri must always be 0.
-
-  always @(negedge clock)
-    if (RegWrite==1 & WR!=0) //Prevents $zero from being overwritten and make sure only when asserted that Write Register is allowed.
-    Regs[WR] <= WD;
-
-endmodule
-
-//ALU1 module is used for bits 0 to 14, but excludes the msb which needs a special set flag.
 module ALU1 (a,b,ainvert,binvert,op,less,carryin,carryout,result);
-
    input a,b,less,carryin,ainvert,binvert;
    input [1:0] op;
    output carryout,result;
 
-   wire nota,notb;
-   wire a1,b1;
-   wire and_out,or_out;
-   wire sum;
-   wire axb,ab,axb_cin;
+   wire nota,notb,a1,b1,and_out,or_out,sum;
 
-   // Inverters
    not (nota,a);
    not (notb,b);
 
-   // Input select
    wire na_inv,nb_inv;
    not (na_inv,ainvert);
    not (nb_inv,binvert);
@@ -128,36 +106,23 @@ module ALU1 (a,b,ainvert,binvert,op,less,carryin,carryout,result);
    and (b_sel1,notb,binvert);
    or  (b1,b_sel0,b_sel1);
 
-   // AND / OR
    and (and_out,a1,b1);
    or  (or_out,a1,b1);
 
-   //full adder added for hierarchial design.
    fulladder fa1(a1, b1, sum, carryin, carryout);
-   //Changed to mux for hierarchial design.
    mux m1(and_out, or_out, sum, less, op, result);
-
 endmodule
 
-
-// 1-bit MSB ALU (bit 15)
 module ALUmsb (a,b,ainvert,binvert,op,less,carryin,carryout,result,set);
-
-input a,b,less,carryin,ainvert,binvert;
+   input a,b,less,carryin,ainvert,binvert;
    input [1:0] op;
    output carryout,result,set;
 
-   wire nota,notb;
-   wire a1,b1;
-   wire and_out,or_out;
-   wire sum;
-   wire axb,ab,axb_cin;
+   wire nota,notb,a1,b1,and_out,or_out,sum;
 
-   // Inverters
    not (nota,a);
    not (notb,b);
 
-   // Input select
    wire na_inv,nb_inv;
    not (na_inv,ainvert);
    not (nb_inv,binvert);
@@ -172,34 +137,24 @@ input a,b,less,carryin,ainvert,binvert;
    and (b_sel1,notb,binvert);
    or  (b1,b_sel0,b_sel1);
 
-   // AND / OR
    and (and_out,a1,b1);
    or  (or_out,a1,b1);
 
-   //full adder added for hierarchial design.
    fulladder fa1(a1, b1, sum, carryin, carryout);
-   //Changed to mux for hierarchial design.
    mux m1(and_out, or_out, sum, less, op, result);
-   buf (set,sum);   // SLT set output is just the sum output of the MSB ALU
 
- 
-
+   buf (set,sum);
 endmodule
 
-
-// 16-bit ALU
 module ALU (op,a,b,result,zero);
-
-   input  [15:0] a;
-   input  [15:0] b;
-   input  [3:0]  op;
+   input  [15:0] a,b;
+   input  [3:0] op;
    output [15:0] result;
    output zero;
 
    wire c1,c2,c3,c4,c5,c6,c7,c8;
    wire c9,c10,c11,c12,c13,c14,c15,c16;
    wire set;
-
    // Bit 0
    ALU1 alu0 (a[0],b[0],op[3],op[2],op[1:0],set,op[2],c1,result[0]);
 
@@ -228,78 +183,158 @@ module ALU (op,a,b,result,zero);
         result[4],result[5],result[6],result[7],
         result[8],result[9],result[10],result[11],
         result[12],result[13],result[14],result[15]);
+endmodule
+
+// REG FILE
+
+module reg_file (RR1,RR2,WR,WD,RegWrite,RD1,RD2,clock);
+  input [1:0] RR1,RR2,WR; //Instead of 5 bits for rs, rt, and rd, it is only two bits. 
+  input [15:0] WD; //16 bits for complete instruction rather than the traditional 32 bits.
+  input RegWrite,clock;
+  output [15:0] RD1,RD2; //The read data ports of the reg file are likewise only 16 bits.
+
+  reg [15:0] Regs[0:3]; //4 registers, 16 bits long.
+
+  assign RD1 = Regs[RR1]; //RS is assigned to read data port 1.
+  assign RD2 = Regs[RR2]; //RT is assigned to read data port 2.
+
+  initial Regs[0] = 0; //$zeri must always be 0.
+
+  always @(negedge clock)
+    if (RegWrite==1 & WR!=0) //Prevents $zero from being overwritten and make sure only when asserted that Write Register is allowed.
+    Regs[WR] <= WD;
 
 endmodule
+
+// CONTROL
+
 //Main control determines if R-type instruction or I-type instruction and sends the coressponding bit [From MSB to LSB] to RegDst,ALUSrc,RegWrite,and ALUOp
 module MainControl (Op,Control); 
   input [3:0] Op;
-  output reg [6:0] Control; //Control is now 7 rather than 4 bits to
-  //account for deletion of ALUcontrol.
-// Control bits: RegDst,ALUSrc,RegWrite,ALUctl
+  output reg [10:0] Control; //Control is now 11 bits.
+// Control bits: RegDst, ALUSrc, MemtoReg, RegWrite, MemWrite, beq, bne, ALUctl
   always @(Op) case (Op)
-   //Fixed: R type Instructions: RegDst = 1, ALUsrc = 0, RegWrite = 1
-    4'b0000: Control <= 7'b1_0_1_0010; // ADD
-    4'b0001: Control <= 7'b1_0_1_0110; // SUB
-    4'b0010: Control <= 7'b1_0_1_0000; // AND
-    4'b0011: Control <= 7'b1_0_1_0001; // OR
-    4'b0100: Control <= 7'b1_0_1_1101; // NAND
-    4'b0101: Control <= 7'b1_0_1_1100; // NOR
-    4'b0110: Control <= 7'b1_0_1_0111; // SLT
-  //Fixed I type Instructions:  RegDst = 0, ALUsrc = 1, RegWrite = 1
-   4'b1000: Control <= 7'b0_1_1_0010; // ADDI
+   // R type Instructions:
+    4'b0000: Control <= 11'b1_0_0_1_0_0_0_0010; // ADD
+    4'b0001: Control <= 11'b1_0_0_1_0_0_0_0110; // SUB
+    4'b0010: Control <= 11'b1_0_0_1_0_0_0_0000; // AND
+    4'b0011: Control <= 11'b1_0_0_1_0_0_0_0001; // OR
+    4'b0101: Control <= 11'b1_0_0_1_0_0_0_1101; // NAND
+    4'b0100: Control <= 11'b1_0_0_1_0__0_0_1100; // NOR
+    4'b0110: Control <= 11'b1_0_0_1_0_0_0_0111; // SLT
+    
+  // I type Instructions:
+   4'b0111: Control <= 11'b0_1_0_1_0_0_0_0010; // ADDI
+   4'b1000: Control <= 11'b0_1_1_1_0_0_0_0010; // LW
+   4'b1001: Control <= 11'b0_1_0_0_1_0_0_0010; // SW
+   4'b1010: Control <= 11'b0_0_0_0_0_1_0_0110; // BEQ
+   4'b1011: Control <= 11'b0_0_0_0_0_0_1_0110; // BNE
+
+    default: Control <= 11'b00000000000;
   endcase
 endmodule
 
+//Branch control determines if the branch should be taken based on the opcode and the zero flag from the ALU.
+module branch_control (beq, bne, zero, PCSrc);
+    input beq, bne, zero;
+    output PCSrc;
 
-module CPU (clock,PC,ALUOut,IR);
+    wire notzero;
+    not (notzero, zero);
+
+    wire beq_taken, bne_taken;
+    and (beq_taken, beq, zero);
+    and (bne_taken, bne, notzero);
+
+    or (PCSrc, beq_taken, bne_taken);
+endmodule
+
+//CPU 
+
+module CPU (clock,PC,WD,IR);
   input clock;
-  output [15:0] ALUOut,IR,PC;
-  reg[15:0] PC;
-  reg[15:0] IMemory[0:1023]; //Maximum of 1024, 16 bit instruction memory addresses.
-  wire [15:0] IR,NextPC,A,B,ALUOut,RD2,SignExtend;
-  wire[3:0] ALUctl;
-  wire [1:0] WR; 
+  output [15:0] WD,IR,PC;
+
+  reg [15:0] PC;
+  reg[15:0] IMemory[0:1023], DMemory[0:1023]; //Expanded with data memory.
+
+  wire [15:0] NextPC,A,B,ALUOut,RD2,SignExtend;
+  wire [15:0] BranchTarget, PCNext;
+  wire [3:0] ALUctl;
+  wire [1:0] WR;
+  wire [15:0] WD; //Needed to write to a data memory address.
   wire RegDst, ALUSrc, RegWrite;
-  wire Unused;
-// Test Program
-  initial begin 
-   //Modified Instructions that showcase full instruction set architecture is accomplished here.
-    IMemory[0] = 16'h810f;  // addi $t1, $0, 15
-    IMemory[1] = 16'h8207;  // addi $t2, $0, 7
-    IMemory[2] = 16'h26e4;  // and  $t3, $t1, $t2
-    IMemory[3] = 16'h17a2;  // sub  $t2, $t1, $t3
-    IMemory[4] = 16'h3ba5;  // or   $t2, $t2, $t3
-    IMemory[5] = 16'h0be0;  // add  $t3, $t2, $t3
-    IMemory[6] = 16'h5b67;  // nor  $t1, $t2, $t3
-    IMemory[7] = 16'h6e6a;  // slt  $t1, $t3, $t2
-    IMemory[8] = 16'h6b6a;  // slt  $t1, $t2, $t3
-    IMemory[9] = 16'h4b66;  // nand $t1, $t2, $t3
-  end
+  wire beq, bne, Zero, PCSrc;
+  wire MemWrite, MemtoReg;
+  wire Unused, Unused2;
+  wire [15:0] MemReturn;
+
+  initial begin
+  // Program (converted to 16-bit)
+
+  IMemory[0] = 16'b1000_00_01_00000000; // lw t1,0($0)
+  IMemory[1] = 16'b1000_00_10_00000010; // lw t2,2($0)
+  IMemory[2] = 16'b0110_01_10_11_000000; // slt t3,t1,t2
+  
+  IMemory[3] = 16'b1010_11_00_00000010; // beq t3,$0,skip
+
+  IMemory[4] = 16'b1001_00_01_00000010; // sw t1,2($0)
+  IMemory[5] = 16'b1001_00_10_00000000; // sw t2,0($0)
+
+  IMemory[6] = 16'b1000_00_01_00000000; // lw t1,0($0)
+  IMemory[7] = 16'b1000_00_10_00000010; // lw t2,2($0)
+
+  IMemory[8] = 16'b0100_10_10_10_000000; // nor t2,t2,t2
+  IMemory[9] = 16'b0111_10_10_00000001; // addi t2,t2,1
+  IMemory[10]= 16'b0000_01_10_11_000000; // add t3,t1,t2
+
+  
+  DMemory[1] = 7;
+  DMemory[0] = 5; // address 2 (because >>1)
+  
+end
+
   initial PC = 0;
+
   assign IR = IMemory[PC>>1];
+  assign MemReturn = DMemory[ALUOut>>1];
+
   muxWR write(IR[9:8], IR[7:6], RegDst, WR);
-  //Since B is 16 bits, 16 muxes are needed which isn't the simplest, but it is gate level.
+  assign SignExtend = {{8{IR[7]}},IR[7:0]};
   muxB mb(RD2, SignExtend, ALUSrc, B);
-  assign SignExtend = {{8{IR[7]}},IR[7:0]}; // sign extension unit
-  reg_file rf (IR[11:10],IR[9:8],WR,ALUOut,RegWrite,A,RD2,clock);
-  ALU fetch (4'b0010,PC,16'd2,NextPC,Unused); //Instructions fetched using the program counter incremented by 2 for the next instruction.
-  ALU ex (ALUctl, A, B, ALUOut, Zero); //Fetched instruction is executed either using R-Type or I-Type instruction format.
-  MainControl MainCtr (IR[15:12],{RegDst,ALUSrc,RegWrite,ALUctl}); //Fixed from ALUOp to ALUCtl.
-  always @(negedge clock) begin 
-    PC <= NextPC;
+
+  muxB write_back(ALUOut, MemReturn, MemtoReg, WD);
+  reg_file rf (IR[11:10],IR[9:8],WR,WD,RegWrite,A,RD2,clock);
+
+  ALU fetch (4'b0010,PC,16'd2,NextPC,);
+  ALU ex (ALUctl, A, B, ALUOut, Zero);
+
+  MainControl MainCtr (IR[15:12],
+    {RegDst, ALUSrc, MemtoReg, RegWrite, MemWrite, beq, bne, ALUctl});
+
+  branch_control BCU (beq, bne, Zero, PCSrc);
+
+  ALU branch_adder (4'b0010, NextPC, {SignExtend[14:0],1'b0}, BranchTarget,Unused2);
+
+  muxB PC_mux(NextPC, BranchTarget, PCSrc, PCNext);
+
+  always @(negedge clock) begin
+    PC <= PCNext;
+    if (MemWrite)
+      DMemory[ALUOut>>1] <= RD2;
   end
 endmodule
 
-// Test module
+
 module test ();
   reg clock;
   wire signed [15:0] WD,IR,PC;
-  CPU test_cpu(clock,PC,WD,IR);
+  CPU cpu(clock,PC,WD,IR);
   always #1 clock = ~clock;
   initial begin
-    $display ("Clock PC   IR                                 WD");
-    $monitor ("%b     %2d   %b  %3d (%b)",clock,PC,IR,WD,WD);
+    $display ("PC   IR  WD ");
+    $monitor ("%2d   %b   %d",PC,IR,WD);
     clock = 1;
-    #18 $finish; //Changed from 16 to 18 to allow IMemory[9] to be executed.
+    #20 $finish;
   end
 endmodule
