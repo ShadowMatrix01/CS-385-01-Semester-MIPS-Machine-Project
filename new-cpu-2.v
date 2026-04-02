@@ -330,7 +330,7 @@ end
   ALU ex (ALUctl, A, B, ALUOut, Zero); //Fetched instruction is executed either using R-Type or I-Type instruction format.
  
   // added beq and bne
-  MainControl MainCtr (IR[15:12],{beq,bne,RegDst,ALUSrc,RegWrite,ALUctl}); //Fixed from ALUOp to ALUCtl.
+  MainControl MainCtr (IR[15:12],{beq,bne,RegDst,MemWrite, MemtoReg, ALUSrc,RegWrite,ALUctl}); //Fixed from ALUOp to ALUCtl.
   
   branch_control BCU (beq, bne, Zero, PCSrc);
 
