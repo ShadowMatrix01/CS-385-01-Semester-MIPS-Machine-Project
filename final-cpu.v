@@ -2,7 +2,7 @@
 // Instructor: Professor Markov
 // Course: CS-385-01
 // Date: 04/02/26
-// Purpose: Complete 16-bit MIPS single-cycle CPU (R-type + I-type)
+// Purpose: 16-bit MIPS single-cycle CPU (R-type + I-type)
 
 // MUXES 
 module mux(a, b, a1, b1, select, out);
@@ -64,14 +64,12 @@ mux2x1 mux13 (a[12], b[12], select, out[12]);
 mux2x1 mux14 (a[13], b[13], select, out[13]);
 mux2x1 mux15 (a[14], b[14], select, out[14]);
 mux2x1 mux16 (a[15], b[15], select, out[15]);
-
 endmodule
 
 // ALU 
 module fulladder(x, y, sum, carryin, carryout);
    input x, y, carryin;
    output sum, carryout;
-
    wire xysum, ab, axb_cin;
 
    xor (xysum,x,y);
@@ -86,7 +84,6 @@ module ALU1 (a,b,ainvert,binvert,op,less,carryin,carryout,result);
    input a,b,less,carryin,ainvert,binvert;
    input [1:0] op;
    output carryout,result;
-
    wire nota,notb,a1,b1,and_out,or_out,sum;
 
    not (nota,a);
@@ -117,7 +114,6 @@ module ALUmsb (a,b,ainvert,binvert,op,less,carryin,carryout,result,set);
    input a,b,less,carryin,ainvert,binvert;
    input [1:0] op;
    output carryout,result,set;
-
    wire nota,notb,a1,b1,and_out,or_out,sum;
 
    not (nota,a);
@@ -142,7 +138,6 @@ module ALUmsb (a,b,ainvert,binvert,op,less,carryin,carryout,result,set);
 
    fulladder fa1(a1, b1, sum, carryin, carryout);
    mux m1(and_out, or_out, sum, less, op, result);
-
    buf (set,sum);
 endmodule
 
@@ -151,7 +146,6 @@ module ALU (op,a,b,result,zero);
    input  [3:0] op;
    output [15:0] result;
    output zero;
-
    wire c1,c2,c3,c4,c5,c6,c7,c8;
    wire c9,c10,c11,c12,c13,c14,c15,c16;
    wire set;
@@ -192,18 +186,13 @@ module reg_file (RR1,RR2,WR,WD,RegWrite,RD1,RD2,clock);
   input [15:0] WD; //16 bits for complete instruction rather than the traditional 32 bits.
   input RegWrite,clock;
   output [15:0] RD1,RD2; //The read data ports of the reg file are likewise only 16 bits.
-
   reg [15:0] Regs[0:3]; //4 registers, 16 bits long.
-
   assign RD1 = Regs[RR1]; //RS is assigned to read data port 1.
   assign RD2 = Regs[RR2]; //RT is assigned to read data port 2.
-
   initial Regs[0] = 0; //$zeri must always be 0.
-
   always @(negedge clock)
     if (RegWrite==1 & WR!=0) //Prevents $zero from being overwritten and make sure only when asserted that Write Register is allowed.
     Regs[WR] <= WD;
-
 endmodule
 
 // CONTROL
@@ -212,23 +201,23 @@ endmodule
 module MainControl (Op,Control); 
   input [3:0] Op;
   output reg [10:0] Control; //Control is now 11 bits.
-// Control bits: RegDst, ALUSrc, MemtoReg, RegWrite, MemWrite, beq, bne, ALUctl
+// Control bits: RegDst, ALUSrc, MemToReg, RegWrite, MemWrite, beq, bne, ALUctl
   always @(Op) case (Op)
    // R type Instructions:
-    4'b0000: Control <= 11'b1_0_0_1_0_0_0_0010; // ADD
-    4'b0001: Control <= 11'b1_0_0_1_0_0_0_0110; // SUB
-    4'b0010: Control <= 11'b1_0_0_1_0_0_0_0000; // AND
-    4'b0011: Control <= 11'b1_0_0_1_0_0_0_0001; // OR
-    4'b0101: Control <= 11'b1_0_0_1_0_0_0_1101; // NAND
-    4'b0100: Control <= 11'b1_0_0_1_0__0_0_1100; // NOR
-    4'b0110: Control <= 11'b1_0_0_1_0_0_0_0111; // SLT
-    
+    4'b0000: Control <= 11'b10010_00_0010; // ADD
+    4'b0001: Control <= 11'b10010_00_0110; // SUB
+    4'b0010: Control <= 11'b10010_00_0000; // AND
+    4'b0011: Control <= 11'b10010_00_0001; // OR
+    4'b0101: Control <= 11'b10010_00_1101; // NAND
+    4'b0100: Control <= 11'b10010_00_1100; // NOR
+    4'b0110: Control <= 11'b10010_00_0111; // SLT
+
   // I type Instructions:
-   4'b0111: Control <= 11'b0_1_0_1_0_0_0_0010; // ADDI
-   4'b1000: Control <= 11'b0_1_1_1_0_0_0_0010; // LW
-   4'b1001: Control <= 11'b0_1_0_0_1_0_0_0010; // SW
-   4'b1010: Control <= 11'b0_0_0_0_0_1_0_0110; // BEQ
-   4'b1011: Control <= 11'b0_0_0_0_0_0_1_0110; // BNE
+   4'b0111: Control <= 11'b01010_00_0010; // ADDI
+   4'b1000: Control <= 11'b01110_00_0010; // LW
+   4'b1001: Control <= 11'b01001_00_0010; // SW
+   4'b1010: Control <= 11'b00000_10_0110; // BEQ
+   4'b1011: Control <= 11'b00000_01_0110; // BNE
 
     default: Control <= 11'b00000000000;
   endcase
@@ -238,14 +227,11 @@ endmodule
 module branch_control (beq, bne, zero, PCSrc);
     input beq, bne, zero;
     output PCSrc;
-
     wire notzero;
     not (notzero, zero);
-
     wire beq_taken, bne_taken;
     and (beq_taken, beq, zero);
     and (bne_taken, bne, notzero);
-
     or (PCSrc, beq_taken, bne_taken);
 endmodule
 
@@ -254,10 +240,8 @@ endmodule
 module CPU (clock,PC,WD,IR);
   input clock;
   output [15:0] WD,IR,PC;
-
   reg [15:0] PC;
   reg[15:0] IMemory[0:1023], DMemory[0:1023]; //Expanded with data memory.
-
   wire [15:0] NextPC,A,B,ALUOut,RD2,SignExtend;
   wire [15:0] BranchTarget, PCNext;
   wire [3:0] ALUctl;
@@ -268,34 +252,23 @@ module CPU (clock,PC,WD,IR);
   wire MemWrite, MemtoReg;
   wire Unused, Unused2;
   wire [15:0] MemReturn;
-
   initial begin
   // Program (converted to 16-bit)
-
   IMemory[0] = 16'b1000_00_01_00000000; // lw t1,0($0)
   IMemory[1] = 16'b1000_00_10_00000010; // lw t2,2($0)
   IMemory[2] = 16'b0110_01_10_11_000000; // slt t3,t1,t2
-  
   IMemory[3] = 16'b1010_11_00_00000010; // beq t3,$0,skip
-
   IMemory[4] = 16'b1001_00_01_00000010; // sw t1,2($0)
   IMemory[5] = 16'b1001_00_10_00000000; // sw t2,0($0)
-
   IMemory[6] = 16'b1000_00_01_00000000; // lw t1,0($0)
   IMemory[7] = 16'b1000_00_10_00000010; // lw t2,2($0)
-
   IMemory[8] = 16'b0100_10_10_10_000000; // nor t2,t2,t2
   IMemory[9] = 16'b0111_10_10_00000001; // addi t2,t2,1
   IMemory[10]= 16'b0000_01_10_11_000000; // add t3,t1,t2
-
-  
   DMemory[1] = 7;
   DMemory[0] = 5; // address 2 (because >>1)
-  
 end
-
   initial PC = 0;
-
   assign IR = IMemory[PC>>1];
   assign MemReturn = DMemory[ALUOut>>1];
 
@@ -308,16 +281,13 @@ end
 
   ALU fetch (4'b0010,PC,16'd2,NextPC,);
   ALU ex (ALUctl, A, B, ALUOut, Zero);
-
+  
   MainControl MainCtr (IR[15:12],
     {RegDst, ALUSrc, MemtoReg, RegWrite, MemWrite, beq, bne, ALUctl});
-
+    
   branch_control BCU (beq, bne, Zero, PCSrc);
-
   ALU branch_adder (4'b0010, NextPC, {SignExtend[14:0],1'b0}, BranchTarget,Unused2);
-
   muxB PC_mux(NextPC, BranchTarget, PCSrc, PCNext);
-
   always @(negedge clock) begin
     PC <= PCNext;
     if (MemWrite)
@@ -325,15 +295,14 @@ end
   end
 endmodule
 
-
 module test ();
   reg clock;
   wire signed [15:0] WD,IR,PC;
   CPU cpu(clock,PC,WD,IR);
   always #1 clock = ~clock;
   initial begin
-    $display ("PC   IR  WD ");
-    $monitor ("%2d   %b   %d",PC,IR,WD);
+    $display ("PC   IR                        WD        ");
+    $monitor ("%2d   (%b)   %d (%b)",PC,IR,WD, WD);
     clock = 1;
     #20 $finish;
   end
