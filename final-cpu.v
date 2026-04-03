@@ -5,6 +5,7 @@
 // Purpose: 16-bit MIPS single-cycle CPU (R-type + I-type)
 
 // MUXES 
+//4x1 Multiplexer, used by the ALU to choose wheter it is an and, or, add, less operation.
 module mux(a, b, a1, b1, select, out);
    input a, b, a1, b1;
    input [1:0] select;
@@ -24,6 +25,7 @@ module mux(a, b, a1, b1, select, out);
    or (out,r0,r1,r2,r3);
 endmodule
 
+//This mux is generic, and is used as a building block for the ALU
 module mux2x1(a, b, select, out);
 input a, b, select;
 output out;
@@ -33,7 +35,7 @@ and (a_out, a, notselect);
 and (b_out, b, select);
 or (out, a_out, b_out);
 endmodule
-
+//This mux is used to select the destination register.
 module muxWR(a, b, select, out);
 input [1:0] a, b;
 input select;
@@ -41,7 +43,7 @@ output [1:0] out;
 mux2x1 one(a[0], b[0], select, out[0]);
 mux2x1 two(a[1], b[1], select, out[1]);
 endmodule
-
+//This mux is used for writing back, for the program counter, and to select between the value RD2 in the register file or the immediate field.
 module muxB (a, b, select, out);
 input [15:0] a, b;
 input select;
@@ -66,7 +68,7 @@ mux2x1 mux15 (a[14], b[14], select, out[14]);
 mux2x1 mux16 (a[15], b[15], select, out[15]);
 endmodule
 
-// ALU 
+//Fulladder is used to handle ALU arithmetic operations.
 module fulladder(x, y, sum, carryin, carryout);
    input x, y, carryin;
    output sum, carryout;
@@ -79,7 +81,7 @@ module fulladder(x, y, sum, carryin, carryout);
    and (axb_cin,xysum,carryin);
    or  (carryout,ab,axb_cin);
 endmodule
-
+//1 bit alu works on bits 0-14 and does operations accordingly.
 module ALU1 (a,b,ainvert,binvert,op,less,carryin,carryout,result);
    input a,b,less,carryin,ainvert,binvert;
    input [1:0] op;
@@ -109,7 +111,7 @@ module ALU1 (a,b,ainvert,binvert,op,less,carryin,carryout,result);
    fulladder fa1(a1, b1, sum, carryin, carryout);
    mux m1(and_out, or_out, sum, less, op, result);
 endmodule
-
+//Does the same as above, but also has a set buffer to the slt flag.
 module ALUmsb (a,b,ainvert,binvert,op,less,carryin,carryout,result,set);
    input a,b,less,carryin,ainvert,binvert;
    input [1:0] op;
@@ -140,7 +142,7 @@ module ALUmsb (a,b,ainvert,binvert,op,less,carryin,carryout,result,set);
    mux m1(and_out, or_out, sum, less, op, result);
    buf (set,sum);
 endmodule
-
+//ALU handles all arithmetic operations by combining the 1 bit alus and nor for the zero flag.
 module ALU (op,a,b,result,zero);
    input  [15:0] a,b;
    input  [3:0] op;
@@ -179,7 +181,7 @@ module ALU (op,a,b,result,zero);
         result[12],result[13],result[14],result[15]);
 endmodule
 
-// REG FILE
+//reg_file, handles reading and writing of registers.
 
 module reg_file (RR1,RR2,WR,WD,RegWrite,RD1,RD2,clock);
   input [1:0] RR1,RR2,WR; //Instead of 5 bits for rs, rt, and rd, it is only two bits. 
@@ -195,9 +197,9 @@ module reg_file (RR1,RR2,WR,WD,RegWrite,RD1,RD2,clock);
     Regs[WR] <= WD;
 endmodule
 
-// CONTROL
 
-//Main control determines if R-type instruction or I-type instruction and sends the coressponding bit [From MSB to LSB] to RegDst,ALUSrc,RegWrite,and ALUOp
+
+//Main control determines if R-type instruction or I-type instruction and sends the coressponding bit [From MSB to LSB] to  RegDst, ALUSrc, MemToReg, RegWrite, MemWrite, beq, bne, ALUctl
 module MainControl (Op,Control); 
   input [3:0] Op;
   output reg [10:0] Control; //Control is now 11 bits.
@@ -235,8 +237,7 @@ module branch_control (beq, bne, zero, PCSrc);
     or (PCSrc, beq_taken, bne_taken);
 endmodule
 
-//CPU 
-
+//CPU, ties all modules together.
 module CPU (clock,PC,WD,IR);
   input clock;
   output [15:0] WD,IR,PC;
@@ -257,17 +258,18 @@ module CPU (clock,PC,WD,IR);
   IMemory[0] = 16'b1000_00_01_00000000; // lw t1,0($0)
   IMemory[1] = 16'b1000_00_10_00000010; // lw t2,2($0)
   IMemory[2] = 16'b0110_01_10_11_000000; // slt t3,t1,t2
-  IMemory[3] = 16'b1011_11_00_00000010; //bne $t3, $zero, skip
-  IMemory[4] = 16'b1001_00_01_00000010; // sw t1,2($0)
-  IMemory[5] = 16'b1001_00_10_00000000; // sw t2,0($0)
-  IMemory[6] = 16'b1000_00_01_00000000; // lw t1,0($0)
-  IMemory[7] = 16'b1000_00_10_00000010; // lw t2,2($0)
-  IMemory[8] = 16'b0100_10_10_10_000000; // nor t2,t2,t2
-  IMemory[9] = 16'b0111_10_10_00000001; // addi t2,t2,1
-  IMemory[10]= 16'b0000_01_10_11_000000; // add t3,t1,t2
-  DMemory[1] = 7;
-  DMemory[0] = 5; // address 2 (because >>1)
+  IMemory[3] = 16'b1010_11_00_00000010; // beq $t3,$zero,skip, see results section!
+  IMemory[4] = 16'b1001_00_01_00000010; // sw $t1,2($0)
+  IMemory[5] = 16'b1001_00_10_00000000; // sw$ t2,0($0)
+  IMemory[6] = 16'b1000_00_01_00000000; // lw $t1,0($0)
+  IMemory[7] = 16'b1000_00_10_00000010; // lw $t2,2($0)
+  IMemory[8] = 16'b0100_10_10_10_000000; // nor $t2,$t2,$t2
+  IMemory[9] = 16'b0111_10_10_00000001; // addi $t2,$t2,1
+  IMemory[10]= 16'b0000_01_10_11_000000; // add $t3,$t1,$t2
+  DMemory[1] = 7; //See Results!
+  DMemory[0] = 5; // address 2 (because >>1), See Results!
 end
+
   initial PC = 0;
   assign IR = IMemory[PC>>1];
   assign MemReturn = DMemory[ALUOut>>1];
@@ -294,7 +296,7 @@ end
       DMemory[ALUOut>>1] <= RD2;
   end
 endmodule
-
+//Test module, handles output and clock pulses of the program.
 module test ();
   reg clock;
   wire signed [15:0] WD,IR,PC;
