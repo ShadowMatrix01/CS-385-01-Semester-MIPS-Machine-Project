@@ -274,19 +274,33 @@ end
    MainControl MainCtr (IFID_IR[15:12],Control);
    assign SignExtend = {{8{IFID_IR[7]}},IFID_IR[7:0]};
 
-
 //=== EXE STAGE ===
    wire [15:0] B,ALUOut;
    reg [3:0] IDEX_ALUctl;
    ALU ex (IDEX_ALUctl, IDEX_RD1, B, ALUOut, Zero);
-   assign B  = (IDEX_ALUSrc) ? IDEX_SignExt: IDEX_RD2;   // ALUSrc Mux 
-   assign WR = (IDEX_RegDst) ? IDEX_rd: IDEX_rt;         // RegDst Mux
+
+   muxB ALUSrcMux (IDEX_RD2, IDEX_SignExt, IDEX_ALUSrc, B);
+   muxWR RegDstMux (IDEX_rt, IDEX_rd, IDEX_RegDst, WR);
    assign WD = ALUOut;
 
-// Forwarding multiplexers
-   assign FWD_RD1 = (IDEX_RegWrite && WR==IFID_IR[11:10]) ? ALUOut: RD1;
-   assign FWD_RD2 = (IDEX_RegWrite && WR==IFID_IR[9:8])  ? ALUOut: RD2;
+// Forwarding select logic
+   wire fwd1_match, fwd2_match;
+   wire [1:0] wr_vs_rs, wr_vs_rt;
+   xor (wr_vs_rs[0], WR[0], IFID_IR[10]);
+   xor (wr_vs_rs[1], WR[1], IFID_IR[11]);
+   xor (wr_vs_rt[0], WR[0], IFID_IR[8]);
+   xor (wr_vs_rt[1], WR[1], IFID_IR[9]);
 
+   wire rs_eq, rt_eq;
+   nor (rs_eq, wr_vs_rs[0], wr_vs_rs[1]);
+   nor (rt_eq, wr_vs_rt[0], wr_vs_rt[1]);
+   and (fwd1_match, IDEX_RegWrite, rs_eq);
+   and (fwd2_match, IDEX_RegWrite, rt_eq);
+
+   // Forwarding muxes
+   muxB FWD1Mux (RD1, ALUOut, fwd1_match, FWD_RD1);
+   muxB FWD2Mux (RD2, ALUOut, fwd2_match, FWD_RD2);
+   
    initial begin
     PC = 0;
     IFID_IR = 0; // clear pipeline register to avoid forwarding from empty pipeline
