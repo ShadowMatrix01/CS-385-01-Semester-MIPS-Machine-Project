@@ -1,7 +1,7 @@
 // Names: Aiden Ocasio, Jacob Rulka, and Jhan Gomez
 // Instructor: Professor Markov
 // Course: CS-385-01
-// Date: 04/21/26
+// Date: 04/23/26
 // Purpose: To demonstrate how a simplfied, 
 // and pipelined 16 bit MIPS cpu can operate for R-type instructions and ADDI.
 module reg_file (RR1,RR2,WR,WD,RegWrite,RD1,RD2,clock);
@@ -195,11 +195,10 @@ module ALU (op,a,b,result,zero);
         result[12],result[13],result[14],result[15]);
 endmodule
 
-//Main control determines if R-type instruction or I-type instruction and sends the coressponding bit [From MSB to LSB] to  RegDst, ALUSrc, MemToReg, RegWrite, MemWrite, beq, bne, ALUctl
+//Main control determines if R-type instruction or I-type instruction and sends the corresponding bit to IDEX_RegDst,IDEX_ALUSrc,IDEX_RegWrite,and IDEX_ALUctl
 module MainControl (Op,Control); 
   input [3:0] Op;
   output reg [6:0] Control; //Control is now 7 bits since no branching.
-// Control bits: IDEX_RegDst,IDEX_ALUSrc,IDEX_RegWrite,IDEX_ALUctl;
   always @(Op) case (Op)
   //R type instructions
     4'b0000: Control <= 7'b1_0_1_0010; // ADD
@@ -286,12 +285,14 @@ end
 // Forwarding select logic
    wire fwd1_match, fwd2_match;
    wire [1:0] wr_vs_rs, wr_vs_rt;
+//If only one instruction in relation to the next uses a register, then xor is 0.
    xor (wr_vs_rs[0], WR[0], IFID_IR[10]);
    xor (wr_vs_rs[1], WR[1], IFID_IR[11]);
    xor (wr_vs_rt[0], WR[0], IFID_IR[8]);
    xor (wr_vs_rt[1], WR[1], IFID_IR[9]);
 
    wire rs_eq, rt_eq;
+//If either the source registers match or the target registers match, then forwarding is needed provided the instruction writes to the register file.
    nor (rs_eq, wr_vs_rs[0], wr_vs_rs[1]);
    nor (rt_eq, wr_vs_rt[0], wr_vs_rt[1]);
    and (fwd1_match, IDEX_RegWrite, rs_eq);
@@ -348,45 +349,3 @@ module test ();
     #29 $finish;
   end
 endmodule
-
-/* Output
-Program with nop's
----------------------------
- PC  IFID_IR   IDEX_IR   WD
- 0  00000000  xxxxxxxx   x
- 4  2009000f  00000000   x
- 8  200a0007  2009000f  15
-12  00000000  200a0007   7
-16  012a5824  00000000   0
-20  00000000  012a5824   7
-24  012b5022  00000000   0
-28  00000000  012b5022   8
-32  014b5025  00000000   0
-36  00000000  014b5025  15
-40  014b5820  00000000   0
-44  00000000  014b5820  22
-48  014b4827  00000000   0
-52  016a482a  014b4827  -32
-56  014b482a  016a482a   0
-60  xxxxxxxx  014b482a   1
-
-Program without nop's
---------------------------
-PC  IFID_IR   IDEX_IR   WD
- 0  00000000  xxxxxxxx   x
- 4  2009000f  00000000   x
- 8  200a0007  2009000f  15
-12  012a5824  200a0007   7
-16  012b5022  012a5824   X
-20  014b5025  012b5022   x
-24  014b5820  014b5025   X
-28  014b4827  014b5820   x
-32  016a482a  014b4827   X
-36  014b482a  016a482a   X
-40  xxxxxxxx  014b482a   X
-44  xxxxxxxx  xxxxxxxx   X
-48  xxxxxxxx  xxxxxxxx   X
-52  xxxxxxxx  xxxxxxxx   X
-56  xxxxxxxx  xxxxxxxx   X
-60  xxxxxxxx  xxxxxxxx   X
-*/
