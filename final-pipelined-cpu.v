@@ -195,26 +195,28 @@ module ALU (op,a,b,result,zero);
 endmodule
 
 
-//Main control determines if R-type instruction or I-type instruction and sends the corresponding bit to   {IDEX_RegDst,IDEX_ALUSrc,IDEX_MemtoReg,IDEX_RegWrite,IDEX_MemWrite,IDEX_BEQ, IDEX_BNE, IDEX_ALUctl} 
+//Main control determines if R-type instruction or I-type instruction and sends the corresponding bit to   {IDEX_RegDst,IDEX_ALUSrc,IDEX_MemtoReg,IDEX_RegWrite,IDEX_MemWrite,IDEX_BEQ, IDEX_BNE, IDEX_JUMP, IDEX_ALUctl} 
 module MainControl (Op,Control); 
   input [3:0] Op;
-  output reg [10:0] Control; //Control is now 1 bits.
+  output reg [11:0] Control; //Control is now 12 bits.
   always @(Op) case (Op)
    // R type Instructions:
-    4'b0000: Control <= 11'b10010_00_0010; // ADD
-    4'b0001: Control <= 11'b10010_00_0110; // SUB
-    4'b0010: Control <= 11'b10010_00_0000; // AND
-    4'b0011: Control <= 11'b10010_00_0001; // OR
-    4'b0101: Control <= 11'b10010_00_1101; // NAND
-    4'b0100: Control <= 11'b10010_00_1100; // NOR
-    4'b0110: Control <= 11'b10010_00_0111; // SLT
+    4'b0000: Control <= 12'b10010_00_0_0010; // ADD
+    4'b0001: Control <= 12'b10010_00_0_0110; // SUB
+    4'b0010: Control <= 12'b10010_00_0_0000; // AND
+    4'b0011: Control <= 12'b10010_00_0_0001; // OR
+    4'b0101: Control <= 12'b10010_00_0_1101; // NAND
+    4'b0100: Control <= 12'b10010_00_0_1100; // NOR
+    4'b0110: Control <= 12'b10010_00_0_0111; // SLT
   // I type Instructions:
-   4'b0111: Control <= 11'b01010_00_0010; // ADDI
-   4'b1000: Control <= 11'b01110_00_0010; // LW
-   4'b1001: Control <= 11'b01001_00_0010; // SW
-   4'b1010: Control <= 11'b00000_10_0110; // BEQ
-   4'b1011: Control <= 11'b00000_01_0110; // BNE
-    default: Control <= 11'b00000000000;
+   4'b0111: Control <= 12'b01010_00_0_0010; // ADDI
+   4'b1000: Control <= 12'b01110_00_0_0010; // LW
+   4'b1001: Control <= 12'b01001_00_0_0010; // SW
+   4'b1010: Control <= 12'b00000_10_0_0110; // BEQ
+   4'b1011: Control <= 12'b00000_01_0_0110; // BNE
+   //J-type Instruction
+   4'b1111: Control <= 12'b00000_00_1_0110; // Jump
+    default: Control <= 12'b000000000000;
  endcase
 endmodule
 
@@ -234,7 +236,11 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
       IMemory[6]  = 16'b0000000000000000;    // nop
       IMemory[7]  = 16'b0000000000000000;    // nop
       IMemory[8]  = 16'b0000000000000000;    // nop
-      IMemory[9]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[15], BNE Swap.
+      //IMemory[9]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[15], 
+      //IMemory[9] = 16'b1011_11_00_00000101 //bne $t3, $0, 5  IMemory[15].
+      
+     // Jumps to instruction address 13, swap.
+      IMemory[9] = 16'b1111_00_00_00001101; //j IMemory[13], Because 15 is too late for the swap, as it reaches the nop.
       IMemory[10] = 16'b0000000000000000;    // nop
       IMemory[11] = 16'b0000000000000000;    // nop
       IMemory[12] = 16'b0000000000000000;    // nop
@@ -269,11 +275,11 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
    wire [15:0] PCplus4, NextPC;
    reg[15:0] PC, IMemory[0:1023], IFID_IR, IFID_PCplus4;
    ALU fetch (4'b0010,PC,16'd2,PCplus4,Unused1);
-   assign NextPC = (EXMEM_BEQ && EXMEM_Zero) || (EXMEM_BNE && ~EXMEM_Zero) ? EXMEM_Target : PCplus4;
+   assign NextPC = (EXMEM_BEQ && EXMEM_Zero) || (EXMEM_BNE && ~EXMEM_Zero) ? EXMEM_Target : (EXMEM_JUMP) ? EXMEM_JumpHere: PCplus4;
 // ID
-   wire [10:0] Control;
+   wire [11:0] Control;
    reg IDEX_RegWrite,IDEX_MemtoReg,
-       IDEX_BEQ, IDEX_BNE,  IDEX_MemWrite,
+       IDEX_BEQ, IDEX_BNE, IDEX_JUMP, IDEX_MemWrite,
        IDEX_ALUSrc,  IDEX_RegDst;
    reg [3:0]  IDEX_ALUctl;
    wire [15:0] RD1,RD2,SignExtend, WD;
@@ -287,12 +293,13 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
    assign SignExtend = {{8{IFID_IR[7]}},IFID_IR[7:0]}; 
 // EXE
    reg EXMEM_RegWrite,EXMEM_MemtoReg,
-       EXMEM_BEQ, EXMEM_BNE, EXMEM_MemWrite;
+       EXMEM_BEQ, EXMEM_BNE, EXMEM_JUMP, EXMEM_MemWrite;
    wire [15:0] Target;
    reg EXMEM_Zero;
    reg [15:0] EXMEM_Target,EXMEM_ALUOut,EXMEM_RD2;
    reg [15:0] EXMEM_IR; // For monitoring the pipeline
    reg [1:0] EXMEM_rd;
+   reg [15:0] EXMEM_JumpHere;
    wire [15:0] B,ALUOut;
    wire [1:0] WR;
    ALU branch (4'b0010,IDEX_SignExt<<1,IDEX_PCplus4,Target,Unused2);
@@ -307,14 +314,14 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
    assign MemOut = DMemory[EXMEM_ALUOut>>1];
    always @(negedge clock) if (EXMEM_MemWrite) DMemory[EXMEM_ALUOut>>1] <= EXMEM_RD2;
 // WB
-   assign WD = (MEMWB_MemtoReg) ? MEMWB_MemOut: MEMWB_ALUOut; // MemtoReg Mux
-
+   //assign WD = (MEMWB_MemtoReg) ? MEMWB_MemOut: MEMWB_ALUOut; // MemtoReg Mux
+   muxB m2(MEMWB_ALUOut, MEMWB_MemOut,MEMWB_MemtoReg,WD);
    initial begin
     PC = 0;
 // Initialize pipeline registers
-    IDEX_RegWrite=0;IDEX_MemtoReg=0;IDEX_BEQ=0;IDEX_BNE=0;IDEX_MemWrite=0;IDEX_ALUSrc=0;IDEX_RegDst=0;IDEX_ALUctl=0;
+    IDEX_RegWrite=0;IDEX_MemtoReg=0;IDEX_BEQ=0;IDEX_BNE=0;IDEX_JUMP=0;IDEX_MemWrite=0;IDEX_ALUSrc=0;IDEX_RegDst=0;IDEX_ALUctl=0;
     IFID_IR=0;
-    EXMEM_RegWrite=0;EXMEM_MemtoReg=0;EXMEM_BEQ=0;EXMEM_BNE=0;EXMEM_MemWrite=0;
+    EXMEM_RegWrite=0;EXMEM_MemtoReg=0;EXMEM_BEQ=0;EXMEM_BNE=0;EXMEM_JUMP=0;EXMEM_MemWrite=0;
     EXMEM_Target=0;
     MEMWB_RegWrite=0;MEMWB_MemtoReg=0;
    end
@@ -327,7 +334,7 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
     IFID_IR <= IMemory[PC>>1];
 // ID
     IDEX_IR <= IFID_IR; // For monitoring the pipeline
-    {IDEX_RegDst,IDEX_ALUSrc,IDEX_MemtoReg,IDEX_RegWrite,IDEX_MemWrite,IDEX_BEQ, IDEX_BNE, IDEX_ALUctl} <= Control;   
+    {IDEX_RegDst,IDEX_ALUSrc,IDEX_MemtoReg,IDEX_RegWrite,IDEX_MemWrite,IDEX_BEQ, IDEX_BNE, IDEX_JUMP, IDEX_ALUctl} <= Control;   
     IDEX_PCplus4 <= IFID_PCplus4;
     IDEX_RD1 <= RD1; 
     IDEX_RD2 <= RD2;
@@ -339,6 +346,7 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
     EXMEM_RegWrite <= IDEX_RegWrite;
     EXMEM_MemtoReg <= IDEX_MemtoReg;
     EXMEM_BEQ  <= IDEX_BEQ;
+    EXMEM_JUMP  <= IDEX_JUMP;
     EXMEM_BNE  <= IDEX_BNE;
     EXMEM_MemWrite <= IDEX_MemWrite;
     EXMEM_Target <= Target;
@@ -346,6 +354,10 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
     EXMEM_ALUOut <= ALUOut;
     EXMEM_RD2 <= IDEX_RD2;
     EXMEM_rd <= WR;
+    EXMEM_JumpHere <= {4'b0000, IDEX_IR[11:0]} << 1; //This was failing, for Jump to work, it has to be logically pipelined
+    //I thought it would work if it simply assigned, but then I recalled this was not the single cycle datapath anymore. 
+   //It was driving me nuts for houyrs, but is simple. Since J uses absoulute address simply take the 12 bits of the address, pad with 0s to reach 
+   //the required 16, and shift left by one to multiply by two to align it to the proper byte address, just like normal MIPS.
 // MEM
     MEMWB_IR <= EXMEM_IR; // For monitoring the pipeline
     MEMWB_RegWrite <= EXMEM_RegWrite;
