@@ -16,7 +16,17 @@ module reg_file (RR1,RR2,WR,WD,RegWrite,RD1,RD2,clock);
     if (RegWrite==1 & WR!=0) //Prevents $zero from being overwritten and make sure only when asserted that Write Register is allowed.
     Regs[WR] <= WD;
 endmodule
-
+//Branch control determines if the branch should be taken based on the opcode and the zero flag from the ALU.
+module branch_control (beq, bne, zero, PCSrc);
+    input beq, bne, zero;
+    output PCSrc;
+    wire notzero;
+    not (notzero, zero);
+    wire beq_taken, bne_taken;
+    and (beq_taken, beq, zero);
+    and (bne_taken, bne, notzero);
+    or (PCSrc, beq_taken, bne_taken);
+endmodule
 // MUXES 
 //4x1 Multiplexer, used by the ALU to choose whether it is an and, or, add, less operation.
 module mux(a, b, a1, b1, select, out);
@@ -58,7 +68,7 @@ module muxWR(a, b, select, out);
     mux2x1 two(a[1], b[1], select, out[1]);
 endmodule
 
-//This mux is used for writing back, for the program counter, and to select between the value RD2 in the register file or the immediate field.
+//This mux is used for writing back, *some of the program counter, and to select between the value RD2 in the register file or the immediate field.
 module muxB (a, b, select, out);
     input [15:0] a, b;
     input select;
@@ -237,11 +247,10 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
       IMemory[6]  = 16'b0000000000000000;    // nop
       IMemory[7]  = 16'b0000000000000000;    // nop
       IMemory[8]  = 16'b0000000000000000;    // nop
-      //IMemory[9]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[15], 
-      //IMemory[9] = 16'b1011_11_00_00000101 //bne $t3, $0, 5  IMemory[15].
-      
+      IMemory[9]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[13], 
+      //IMemory[9] = 16'b1011_11_00_00000101; //bne $t3, $0, 5  IMemory[13]. 
      // Jumps to instruction address 13, swap.
-      IMemory[9] = 16'b1111_00_00_00001101; //j IMemory[13], Because 15 is too late for the swap, as it reaches the nop.
+      //IMemory[9] = 16'b1111_00_00_00001101; //j IMemory[13], Because 15 is too late for the swap, as it reaches the nop.
       IMemory[10] = 16'b0000000000000000;    // nop
       IMemory[11] = 16'b0000000000000000;    // nop
       IMemory[12] = 16'b0000000000000000;    // nop
@@ -273,10 +282,13 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
 
 // Pipeline 
 // IF 
-   wire [15:0] PCplus4, NextPC;
+   wire [15:0] PCplus4, NextPC, PCBranchOrTarget;
+   wire PCBranchValid;
    reg[15:0] PC, IMemory[0:1023], IFID_IR, IFID_PCplus4;
    ALU fetch (4'b0010,PC,16'd2,PCplus4,Unused1);
-   assign NextPC = (EXMEM_BEQ && EXMEM_Zero) || (EXMEM_BNE && ~EXMEM_Zero) ? EXMEM_Target : (EXMEM_JUMP) ? EXMEM_JumpHere: PCplus4;
+   branch_control BCU(EXMEM_BEQ, EXMEM_BNE, EXMEM_Zero, PCBranchValid); //Branching
+   muxB branchOrTarget(PCplus4, EXMEM_Target, PCBranchValid, PCBranchOrTarget); //Branching or Target
+   muxB addr(PCBranchOrTarget, EXMEM_JumpHere, EXMEM_JUMP, NextPC); //NextPC chosen.
 // ID
    wire [11:0] Control;
    reg IDEX_RegWrite,IDEX_MemtoReg,
@@ -314,7 +326,9 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
    reg [15:0] MEMWB_IR; // For monitoring the pipeline
    wire [15:0] MemOut;
    assign MemOut = DMemory[EXMEM_ALUOut>>1];
-   always @(negedge clock) if (EXMEM_MemWrite) DMemory[EXMEM_ALUOut>>1] <= EXMEM_RD2;
+   always @(negedge clock) 
+      if (EXMEM_MemWrite) 
+          DMemory[EXMEM_ALUOut>>1] <= EXMEM_RD2;
 // WB
    muxB m2(MEMWB_ALUOut, MEMWB_MemOut,MEMWB_MemtoReg,WD);
    initial begin
