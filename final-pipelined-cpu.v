@@ -47,9 +47,10 @@ module mux2x1(a, b, select, out);
     and (a_out, a, notselect);
     and (b_out, b, select);
     or (out, a_out, b_out);
-    endmodule
-    //This mux is used to select the destination register.
-    module muxWR(a, b, select, out);
+endmodule
+
+//This mux is used to select the destination register.
+module muxWR(a, b, select, out);
     input [1:0] a, b;
     input select;
     output [1:0] out;
@@ -304,8 +305,9 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
    wire [1:0] WR;
    ALU branch (4'b0010,IDEX_SignExt<<1,IDEX_PCplus4,Target,Unused2);
    ALU ex (IDEX_ALUctl, IDEX_RD1, B, ALUOut, Zero);
-   assign B  = (IDEX_ALUSrc) ? IDEX_SignExt: IDEX_RD2;        // ALUSrc Mux 
-   assign WR = (IDEX_RegDst) ? IDEX_rd: IDEX_rt;              // RegDst Mux
+
+   muxB mb(IDEX_RD2, IDEX_SignExt, IDEX_ALUSrc, B);
+   muxWR generic(IDEX_rt, IDEX_rd, IDEX_RegDst, WR);
 // MEM
    reg MEMWB_MemtoReg;
    reg [15:0] DMemory[0:1023],MEMWB_MemOut,MEMWB_ALUOut;
@@ -314,7 +316,6 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
    assign MemOut = DMemory[EXMEM_ALUOut>>1];
    always @(negedge clock) if (EXMEM_MemWrite) DMemory[EXMEM_ALUOut>>1] <= EXMEM_RD2;
 // WB
-   //assign WD = (MEMWB_MemtoReg) ? MEMWB_MemOut: MEMWB_ALUOut; // MemtoReg Mux
    muxB m2(MEMWB_ALUOut, MEMWB_MemOut,MEMWB_MemtoReg,WD);
    initial begin
     PC = 0;
