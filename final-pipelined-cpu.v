@@ -1,7 +1,7 @@
 // Names: Aiden Ocasio, Jacob Rulka, and Jhan Gomez
 // Instructor: Professor Markov
 // Course: CS-385-01
-// Date: 05/05/26
+// Date: 05/07/26
 // Purpose: To demonstrate how the final, 5 stage pipelined CPU in MIPS would perform.
 module reg_file (RR1,RR2,WR,WD,RegWrite,RD1,RD2,clock);
   input [1:0] RR1,RR2,WR; //Instead of 5 bits for rs, rt, and rd, it is only two bits. 
@@ -12,7 +12,7 @@ module reg_file (RR1,RR2,WR,WD,RegWrite,RD1,RD2,clock);
   assign RD1 = Regs[RR1]; //RS is assigned to read data port 1.
   assign RD2 = Regs[RR2]; //RT is assigned to read data port 2.
   initial Regs[0] = 0; //$zero must always be 0.
-  always @(negedge clock)
+  always @(posedge clock) //Jacob, changed to posedge, explained why in report! Only two nops needed.
     if (RegWrite==1 & WR!=0) //Prevents $zero from being overwritten and make sure only when asserted that Write Register is allowed.
     Regs[WR] <= WD;
 endmodule
@@ -242,36 +242,30 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
       IMemory[1]  = 16'b1000_00_10_00000010; // lw $t2, 2($0)
       IMemory[2]  = 16'b0000000000000000;    // nop
       IMemory[3]  = 16'b0000000000000000;    // nop
-      IMemory[4]  = 16'b0000000000000000;    // nop
-      IMemory[5]  = 16'b0110_01_10_11000000; // slt $t3,$t1,$t2
+      IMemory[4]  = 16'b0110_01_10_11000000; // slt $t3,$t1,$t2
+      IMemory[5]  = 16'b0000000000000000;    // nop
       IMemory[6]  = 16'b0000000000000000;    // nop
-      IMemory[7]  = 16'b0000000000000000;    // nop
-      IMemory[8]  = 16'b0000000000000000;    // nop
-     // IMemory[9]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[15], 
-      //IMemory[9] = 16'b1011_11_00_00000101; //bne $t3, $0, 5  IMemory[15]. 
-      IMemory[9] = 16'b1111_00_00_00001111; //  // Jumps to instruction address 15, swap. j IMemory[15], 
-      IMemory[10] = 16'b0000000000000000;    // nop
-      IMemory[11] = 16'b0000000000000000;    // nop
+      IMemory[7]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[12], //Correct if not taken or taken.
+   //   IMemory[7] = 16'b1011_11_00_00000101; //bne $t3, $0, 5  IMemory[12]. //Never correct, regardless of taken or not taken
+    //  IMemory[7] = 16'b1111_00_00_00001110; //  Jumps to instruction address 14, no swap. j IMemory[12]. never correct, regardless of DMemory.
+    //  IMemory[7] = 16'b1111_00_00_00001010; //  Jumps to instruction address 10, swap. j IMemory[10], corecct output if DMemory[0]=5, DMemory[1]=7
+      IMemory[8] = 16'b0000000000000000;    // nop
+      IMemory[9] = 16'b0000000000000000;    // nop
+      IMemory[10] = 16'b1001_00_01_00000010; // sw $t1, 2($0)
+      IMemory[11] = 16'b1001_00_10_00000000; // sw $t2, 0($0)
       IMemory[12] = 16'b0000000000000000;    // nop
-      IMemory[13] = 16'b1001_00_01_00000010; // sw $t1, 2($0)
-      IMemory[14] = 16'b1001_00_10_00000000; // sw $t2, 0($0)
-      IMemory[15] = 16'b0000000000000000;    // nop
+      IMemory[13] = 16'b0000000000000000;    // nop
+      IMemory[14] = 16'b1000_00_01_00000000; // lw $t1, 0($0)
+      IMemory[15] = 16'b1000_00_10_00000010; // lw $t2, 2($0)
       IMemory[16] = 16'b0000000000000000;    // nop
       IMemory[17] = 16'b0000000000000000;    // nop
-      IMemory[18] = 16'b1000_00_01_00000000; // lw $t1, 0($0)
-      IMemory[19] = 16'b1000_00_10_00000010; // lw $t2, 2($0)
+      IMemory[18] = 16'b0100_10_10_10000000; // nor $t2,$t2,$t2
+      IMemory[19] = 16'b0000000000000000;    // nop
       IMemory[20] = 16'b0000000000000000;    // nop
-      IMemory[21] = 16'b0000000000000000;    // nop
+      IMemory[21] = 16'b0111_10_10_00000001; // addi $t2,$t2,1
       IMemory[22] = 16'b0000000000000000;    // nop
-      IMemory[23] = 16'b0100_10_10_10000000; // nor $t2,$t2,$t2
-      IMemory[24] = 16'b0000000000000000;    // nop
-      IMemory[25] = 16'b0000000000000000;    // nop
-      IMemory[26] = 16'b0000000000000000;    // nop
-      IMemory[27] = 16'b0111_10_10_00000001; // addi $t2,$t2,1
-      IMemory[28] = 16'b0000000000000000;    // nop
-      IMemory[29] = 16'b0000000000000000;    // nop
-      IMemory[30] = 16'b0000000000000000;    // nop
-      IMemory[31] = 16'b0000_01_10_11000000; // add $t3,$t1,$t2
+      IMemory[23] = 16'b0000000000000000;    // nop
+      IMemory[24] = 16'b0000_01_10_11000000; // add $t3,$t1,$t2
 
  
 // Data
