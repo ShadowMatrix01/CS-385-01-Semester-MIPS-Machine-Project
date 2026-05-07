@@ -12,7 +12,7 @@ module reg_file (RR1,RR2,WR,WD,RegWrite,RD1,RD2,clock);
   assign RD1 = Regs[RR1]; //RS is assigned to read data port 1.
   assign RD2 = Regs[RR2]; //RT is assigned to read data port 2.
   initial Regs[0] = 0; //$zero must always be 0.
-  always @(negedge clock)
+  always @(posedge clock) // -------------------------------------------------- Extra Credit: negedge for 3 nops and posedge for 2 nops
     if (RegWrite==1 & WR!=0) //Prevents $zero from being overwritten and make sure only when asserted that Write Register is allowed.
     Regs[WR] <= WD;
 endmodule
@@ -247,9 +247,10 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
       IMemory[6]  = 16'b0000000000000000;    // nop
       IMemory[7]  = 16'b0000000000000000;    // nop
       IMemory[8]  = 16'b0000000000000000;    // nop
-     // IMemory[9]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[15], 
-      //IMemory[9] = 16'b1011_11_00_00000101; //bne $t3, $0, 5  IMemory[15]. 
-      IMemory[9] = 16'b1111_00_00_00001111; //  // Jumps to instruction address 15, swap. j IMemory[15], 
+      IMemory[9]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[13], 
+      //IMemory[9] = 16'b1011_11_00_00000101; //bne $t3, $0, 5  IMemory[13]. 
+     // Jumps to instruction address 13, swap.
+      //IMemory[9] = 16'b1111_00_00_00001101; //j IMemory[13], Because 15 is too late for the swap, as it reaches the nop.
       IMemory[10] = 16'b0000000000000000;    // nop
       IMemory[11] = 16'b0000000000000000;    // nop
       IMemory[12] = 16'b0000000000000000;    // nop
@@ -270,8 +271,8 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
       IMemory[27] = 16'b0111_10_10_00000001; // addi $t2,$t2,1
       IMemory[28] = 16'b0000000000000000;    // nop
       IMemory[29] = 16'b0000000000000000;    // nop
-      IMemory[30] = 16'b0000000000000000;    // nop
-      IMemory[31] = 16'b0000_01_10_11000000; // add $t3,$t1,$t2
+      // IMemory[30] = 16'b0000000000000000;    // nop
+      IMemory[30] = 16'b0000_01_10_11000000; // add $t3,$t1,$t2
 
  
 // Data
@@ -335,7 +336,7 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
 // Initialize pipeline registers
     IDEX_RegWrite=0;IDEX_MemtoReg=0;IDEX_BEQ=0;IDEX_BNE=0;IDEX_JUMP=0;IDEX_MemWrite=0;IDEX_ALUSrc=0;IDEX_RegDst=0;IDEX_ALUctl=0;
     IFID_IR=0;
-    EXMEM_RegWrite=0;EXMEM_MemtoReg=0;EXMEM_BEQ=0;EXMEM_BNE=0;EXMEM_JUMP=0;EXMEM_Zero=0;EXMEM_MemWrite=0;
+    EXMEM_RegWrite=0;EXMEM_MemtoReg=0;EXMEM_BEQ=0;EXMEM_BNE=0;EXMEM_JUMP=0;EXMEM_MemWrite=0;
     EXMEM_Target=0;
     MEMWB_RegWrite=0;MEMWB_MemtoReg=0;
    end
@@ -392,7 +393,7 @@ module test ();
   always #1 clock = ~clock;
   initial begin
     $display ("PC   IFID_IR  IDEX_IR  EXMEM_IR MEMWB_IR  WD");
-    $monitor ("%3d   %h     %h      %h    %h    %2d",PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
+    $monitor ("%3d  %h %h %h %h %2d",PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
     clock = 1;
     #69 $finish;
   end
@@ -436,4 +437,3 @@ PC   IFID_IR  IDEX_IR  EXMEM_IR MEMWB_IR  WD
 132  xxxxxxxx 012a5820 00000000 00000000  0
 136  xxxxxxxx xxxxxxxx 012a5820 00000000  0
 140  xxxxxxxx xxxxxxxx xxxxxxxx 012a5820  2
-*/
