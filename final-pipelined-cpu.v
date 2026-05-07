@@ -247,10 +247,9 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
       IMemory[6]  = 16'b0000000000000000;    // nop
       IMemory[7]  = 16'b0000000000000000;    // nop
       IMemory[8]  = 16'b0000000000000000;    // nop
-      IMemory[9]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[13], 
-      //IMemory[9] = 16'b1011_11_00_00000101; //bne $t3, $0, 5  IMemory[13]. 
-     // Jumps to instruction address 13, swap.
-      //IMemory[9] = 16'b1111_00_00_00001101; //j IMemory[13], Because 15 is too late for the swap, as it reaches the nop.
+     // IMemory[9]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[15], 
+      //IMemory[9] = 16'b1011_11_00_00000101; //bne $t3, $0, 5  IMemory[15]. 
+      IMemory[9] = 16'b1111_00_00_00001111; //  // Jumps to instruction address 15, swap. j IMemory[15], 
       IMemory[10] = 16'b0000000000000000;    // nop
       IMemory[11] = 16'b0000000000000000;    // nop
       IMemory[12] = 16'b0000000000000000;    // nop
@@ -336,7 +335,7 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
 // Initialize pipeline registers
     IDEX_RegWrite=0;IDEX_MemtoReg=0;IDEX_BEQ=0;IDEX_BNE=0;IDEX_JUMP=0;IDEX_MemWrite=0;IDEX_ALUSrc=0;IDEX_RegDst=0;IDEX_ALUctl=0;
     IFID_IR=0;
-    EXMEM_RegWrite=0;EXMEM_MemtoReg=0;EXMEM_BEQ=0;EXMEM_BNE=0;EXMEM_JUMP=0;EXMEM_MemWrite=0;
+    EXMEM_RegWrite=0;EXMEM_MemtoReg=0;EXMEM_BEQ=0;EXMEM_BNE=0;EXMEM_JUMP=0;EXMEM_Zero=0;EXMEM_MemWrite=0;
     EXMEM_Target=0;
     MEMWB_RegWrite=0;MEMWB_MemtoReg=0;
    end
@@ -393,7 +392,7 @@ module test ();
   always #1 clock = ~clock;
   initial begin
     $display ("PC   IFID_IR  IDEX_IR  EXMEM_IR MEMWB_IR  WD");
-    $monitor ("%3d  %h %h %h %h %2d",PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
+    $monitor ("%3d   %h     %h      %h    %h    %2d",PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
     clock = 1;
     #69 $finish;
   end
