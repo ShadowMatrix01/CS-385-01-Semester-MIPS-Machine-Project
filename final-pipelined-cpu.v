@@ -167,6 +167,7 @@ module ALUmsb (a,b,ainvert,binvert,op,less,carryin,carryout,result,set);
    mux m1(and_out, or_out, sum, less, op, result);
    buf (set,sum);
 endmodule
+//16 bit ALu, handles arithmetic and logic.
 module ALU (op,a,b,result,zero);
    input  [15:0] a,b;
    input  [3:0] op;
@@ -245,10 +246,10 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
       IMemory[4]  = 16'b0110_01_10_11000000; // slt $t3,$t1,$t2
       IMemory[5]  = 16'b0000000000000000;    // nop
       IMemory[6]  = 16'b0000000000000000;    // nop
-      IMemory[7]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[12], //Correct if not taken or taken.
-   //   IMemory[7] = 16'b1011_11_00_00000101; //bne $t3, $0, 5  IMemory[12]. //Never correct, regardless of taken or not taken
-    //  IMemory[7] = 16'b1111_00_00_00001110; //  Jumps to instruction address 14, no swap. j IMemory[12]. never correct, regardless of DMemory.
-    //  IMemory[7] = 16'b1111_00_00_00001010; //  Jumps to instruction address 10, swap. j IMemory[10], corecct output if DMemory[0]=5, DMemory[1]=7
+      //IMemory[7]  = 16'b1010_11_00_00000101; // beq $t3,$0,5  IMemory[12], //Correct if not taken.
+      //IMemory[7] = 16'b1011_11_00_00000101; //bne $t3, $0, 5  IMemory[12]. //Never correct, regardless of taken or not taken
+      //IMemory[7] = 16'b1111_00_00_00001100; //  Jumps to instruction address 12, no swap. j IMemory[12]. never correct, regardless of DMemory.
+      IMemory[7] = 16'b1111_00_00_00001010; //  Jumps to instruction address 10, swap. j IMemory[10], corecct output if DMemory[0]=5, DMemory[1]=7
       IMemory[8] = 16'b0000000000000000;    // nop
       IMemory[9] = 16'b0000000000000000;    // nop
       IMemory[10] = 16'b1001_00_01_00000010; // sw $t1, 2($0)
@@ -269,8 +270,8 @@ module CPU (clock,PC,IFID_IR,IDEX_IR,EXMEM_IR,MEMWB_IR,WD);
 
  
 // Data
-   DMemory[0] = 5; // switch the cells and see how the simulation output changes
-   DMemory[1] = 7; // (beq is taken if DMemory[0]=7; DMemory[1]=5, not taken otherwise)
+   DMemory[0] = 7; // switch the cells and see how the simulation output changes
+   DMemory[1] = 5; // (beq is taken if DMemory[0]=7; DMemory[1]=5, not taken otherwise)
   end
 
 // Pipeline 
